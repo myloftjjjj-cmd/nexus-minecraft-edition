@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS public.projects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL DEFAULT auth.uid(), name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 80), edition text NOT NULL CHECK (edition IN ('Java','Bedrock')), project_type text NOT NULL CHECK (project_type IN ('Mod','Resource Pack','Server Plugin','Bedrock Add-on')), minecraft_version text NOT NULL, loader text NOT NULL DEFAULT 'None', runtime_or_script_api text NOT NULL DEFAULT '', package_id text NOT NULL CHECK (package_id ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$'), description text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+
+CREATE TABLE IF NOT EXISTS public.project_files (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE, user_id uuid NOT NULL DEFAULT auth.uid(), path text NOT NULL CHECK (char_length(path) BETWEEN 1 AND 300 AND path NOT LIKE '/%' AND path NOT LIKE '%..%'), content text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE (project_id, path));
+
+CREATE INDEX IF NOT EXISTS projects_user_updated_idx ON public.projects (user_id, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS project_files_project_idx ON public.project_files (project_id);
+
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.project_files ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS projects_owner_select ON public.projects; CREATE POLICY projects_owner_select ON public.projects FOR SELECT TO authenticated USING (auth.uid() = user_id); DROP POLICY IF EXISTS projects_owner_insert ON public.projects; CREATE POLICY projects_owner_insert ON public.projects FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id); DROP POLICY IF EXISTS projects_owner_update ON public.projects; CREATE POLICY projects_owner_update ON public.projects FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id); DROP POLICY IF EXISTS projects_owner_delete ON public.projects; CREATE POLICY projects_owner_delete ON public.projects FOR DELETE TO authenticated USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS files_owner_select ON public.project_files; CREATE POLICY files_owner_select ON public.project_files FOR SELECT TO authenticated USING (auth.uid() = user_id); DROP POLICY IF EXISTS files_owner_insert ON public.project_files; CREATE POLICY files_owner_insert ON public.project_files FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id AND EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id AND p.user_id = auth.uid())); DROP POLICY IF EXISTS files_owner_update ON public.project_files; CREATE POLICY files_owner_update ON public.project_files FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id); DROP POLICY IF EXISTS files_owner_delete ON public.project_files; CREATE POLICY files_owner_delete ON public.project_files FOR DELETE TO authenticated USING (auth.uid() = user_id);
