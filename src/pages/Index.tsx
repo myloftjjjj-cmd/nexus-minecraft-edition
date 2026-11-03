@@ -147,29 +147,81 @@ export default function Index() {
       if (removed) URL.revokeObjectURL(removed.url);
       return previous.filter((item) => item.id !== id);
     });
+
+    async function sendMessage() {
+  const content = input.trim();
+
+  if ((!content && attachments.length === 0) || sending) return;
+
+  const userMessage: Message = {
+    id: `${Date.now()}`,
+    role: "user",
+    content,
+    attachments: [...attachments],
+  };
+
+  const conversationHistory = [
+    ...messages,
+    userMessage,
+  ];
+
+  setMessages(conversationHistory);
+  setInput("");
+  setAttachments([]);
+  setNotice("");
+  setSending(true);
+
+  if (textareaRef.current) {
+    textareaRef.current.style.height = "auto";
   }
 
-  function sendMessage() {
-    const content = input.trim();
+  try {
+    const generator = await getLocalGenerator();
 
-    if (!content && attachments.length === 0) return;
+    const prompt = conversationHistory
+      .map((message) =>
+        `${message.role === "user" ? "User" : "Nexus"}: ${message.content}`
+      )
+      .join("\n\n") + "\n\nNexus:";
 
-    const userMessage: Message = {
-      id: `${Date.now()}`,
-      role: "user",
-      content,
-      attachments: [...attachments],
-    };
+    const result = await generator(prompt as any, {
+      max_new_tokens: 256,
+      temperature: 0.7,
+      do_sample: true,
+    });
 
-    setMessages((previous) => [...previous, userMessage]);
-    setInput("");
-    setAttachments([]);
-    setNotice("");
+    let answer = result?.[0]?.generated_text ?? "";
 
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
+    if (typeof answer !== "string") {
+      throw new Error("Unexpected model response.");
     }
+
+    answer = answer.startsWith(prompt)
+      ? answer.slice(prompt.length).trim()
+      : answer.trim();
+
+    if (!answer) {
+      throw new Error("The AI returned an empty response.");
+    }
+
+    setMessages((previous) => [
+      ...previous,
+      {
+        id: `${Date.now()}-ai`,
+        role: "assistant",
+        content: answer,
+      },
+    ]);
+  } catch (error) {
+    console.error("Nexus AI error:", error);
+
+    setNotice(
+      "Nexus couldn't generate a response. Check model support and try again."
+    );
+  } finally {
+    setSending(false);
   }
+    }
 
   function newChat() {
     setAttachments((previous) => {
