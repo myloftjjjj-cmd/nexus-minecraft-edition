@@ -37,9 +37,8 @@ const menuItems = [
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_ATTACHMENTS = 10;
-
 type LocalGenerator = (
-  messages: { role: string; content: string }[],
+  prompt: string,
   options: Record<string, unknown>
 ) => Promise<any>;
 
