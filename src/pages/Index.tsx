@@ -38,6 +38,38 @@ const menuItems = [
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_ATTACHMENTS = 10;
 
+type LocalGenerator = (
+  messages: { role: string; content: string }[],
+  options: Record<string, unknown>
+) => Promise<any>;
+
+let generatorPromise: Promise<LocalGenerator> | null = null;
+
+async function getLocalGenerator(): Promise<LocalGenerator> {
+  if (!generatorPromise) {
+    generatorPromise = (async () => {
+      try {
+        return (await pipeline(
+          "text-generation",
+          "onnx-community/Qwen3-0.6B-ONNX",
+          { device: "webgpu", dtype: "q4" }
+        )) as unknown as LocalGenerator;
+      } catch {
+        return (await pipeline(
+          "text-generation",
+          "onnx-community/Qwen3-0.6B-ONNX",
+          { dtype: "q4" }
+        )) as unknown as LocalGenerator;
+      }
+    })().catch((error) => {
+      generatorPromise = null;
+      throw error;
+    });
+  }
+
+  return generatorPromise;
+}
+
 export default function Index() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
