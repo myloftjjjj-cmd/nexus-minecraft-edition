@@ -1,5 +1,6 @@
 
 import { useState, useRef, useEffect } from "react";
+import { pipeline } from "@huggingface/transformers";
 
 type Attachment = {
   id: string;
@@ -691,4 +692,4 @@ export default function Index() {
                             {formatSize(attachment.size)}
                           </div>
                         </div>
-         
+        
