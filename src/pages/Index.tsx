@@ -11,6 +11,49 @@ type Attachment = {
   file: File;
 };
 
+async function readAttachmentText(file: File): Promise<string> {
+  const name = file.name.toLowerCase();
+
+  // Read plain text and common code files
+  const textExtensions = [
+    ".txt", ".md", ".json", ".js", ".jsx", ".ts", ".tsx",
+    ".css", ".html", ".xml", ".yml", ".yaml", ".toml",
+    ".java", ".kt", ".py", ".lua", ".c", ".cpp", ".h",
+    ".sh", ".sql", ".properties", ".log", ".mcfunction"
+  ];
+
+  if (
+    file.type.startsWith("text/") ||
+    textExtensions.some((ext) => name.endsWith(ext))
+  ) {
+    return await file.text();
+  }
+
+  // Extract text from PDFs
+  if (file.type === "application/pdf" || name.endsWith(".pdf")) {
+    const pdfjs = await import("pdfjs-dist");
+    const pdf = await pdfjs.getDocument({
+      data: await file.arrayBuffer(),
+    }).promise;
+
+    const pages: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item) => ("str" in item ? item.str : ""))
+        .join(" ");
+
+      pages.push(`Page ${pageNumber}:\n${pageText}`);
+    }
+
+    return pages.join("\n\n");
+  }
+
+  return "";
+}
+
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -184,44 +227,110 @@ export default function Index() {
       .join("\n\n") + "\n\nNexus:";
 
     const result = await generator(prompt as any, {
-      max_new_tokens: 256,
-      temperature: 0.7,
-      do_sample: true,
+
+  function removeAttachment(id: string) {
+    setAttachments((previous) => {
+      const removed = previous.find((item) => item.id === id);
+      if (removed) URL.revokeObjectURL(removed.url);
+      return previous.filter((item) => item.id !== id);
     });
-
-    let answer = result?.[0]?.generated_text ?? "";
-
-    if (typeof answer !== "string") {
-      throw new Error("Unexpected model response.");
-    }
-
-    answer = answer.startsWith(prompt)
-      ? answer.slice(prompt.length).trim()
-      : answer.trim();
-
-    if (!answer) {
-      throw new Error("The AI returned an empty response.");
-    }
-
-    setMessages((previous) => [
-      ...previous,
-      {
-        id: `${Date.now()}-ai`,
-        role: "assistant",
-        content: answer,
-      },
-    ]);
-  } catch (error) {
-    console.error("Nexus AI error:", error);
-
-    setNotice(
-      "Nexus couldn't generate a response. Check model support and try again."
-    );
-  } finally {
-    setSending(false);
   }
+
+  async function sendMessage() {
+    const content = input.trim();
+
+    if ((!content && attachments.length === 0) || sending) return;
+
+    const userMessage: Message = {
+      id: `${Date.now()}`,
+      role: "user",
+      content,
+      attachments: [...attachments],
+    };
+
+    const conversationHistory = [...messages, userMessage];
+
+    setMessages(conversationHistory);
+    setInput("");
+    setAttachments([]);
+    setNotice("");
+    setSending(true);
+
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
     }
 
+    try {
+      const generator = await getLocalGenerator();
+      const promptParts: string[] = [];
+
+      for (const message of conversationHistory) {
+        promptParts.push(
+          `${message.role === "user" ? "User" : "Nexus"}: ${message.content}`
+        );
+
+        for (const attachment of message.attachments ?? []) {
+          const extracted = await readAttachmentText(attachment.file);
+
+          if (extracted.trim()) {
+            promptParts.push(
+              `Contents of attached file "${attachment.name}":\n${extracted.slice(0, 12000)}`
+            );
+          } else if (
+            attachment.type.startsWith("image/") ||
+            /\.(png|jpe?g|webp|gif|bmp)$/i.test(attachment.name)
+          ) {
+            promptParts.push(
+              `The user attached an image named "${attachment.name}". Image understanding is not connected yet.`
+            );
+          } else {
+            promptParts.push(
+              `Attached file "${attachment.name}" could not be read as text.`
+            );
+          }
+        }
+      }
+
+      const prompt = promptParts.join("\n\n") + "\n\nNexus:";
+
+      const result = await generator(prompt, {
+        max_new_tokens: 256,
+        temperature: 0.7,
+        do_sample: true,
+      });
+
+      let answer = result?.[0]?.generated_text ?? "";
+
+      if (typeof answer !== "string") {
+        throw new Error("Unexpected model response.");
+      }
+
+      answer = answer.startsWith(prompt)
+        ? answer.slice(prompt.length).trim()
+        : answer.trim();
+
+      if (!answer) {
+        throw new Error("The AI returned an empty response.");
+      }
+
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `${Date.now()}-ai`,
+          role: "assistant",
+          content: answer,
+        },
+      ]);
+    } catch (error) {
+      console.error("Nexus AI error:", error);
+      setNotice(
+        "Nexus couldn't generate a response. Check your connection and model support, then try again."
+      );
+    } finally {
+      setSending(false);
+    }
+    }
+    
   function newChat() {
     setAttachments((previous) => {
       previous.forEach((item) => URL.revokeObjectURL(item.url));
