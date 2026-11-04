@@ -70,11 +70,16 @@ const initialMessages: Message[] = [
   },
 ];
 
+
 const menuItems = [
   { label: "New chat", icon: "+" },
+  { label: "Search chats", icon: "⌕" },
   { label: "Projects", icon: "▣" },
+  { label: "Minecraft mods", icon: "⚒" },
+  { label: "Plugins", icon: "🔌" },
+  { label: "Resource packs", icon: "▧" },
+  { label: "Datapacks & commands", icon: "⌘" },
   { label: "History", icon: "◷" },
-  { label: "Minecraft tools", icon: "◇" },
   { label: "Settings", icon: "⚙" },
 ];
 
