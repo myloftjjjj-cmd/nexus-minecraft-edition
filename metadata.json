@@ -1,0 +1,8 @@
+{
+  "name": "Nexus MC Edition",
+  "description": "Minecraft development assistant and project manager for mods, plugins, resource packs, and datapacks",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

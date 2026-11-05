@@ -1,15 +1,17 @@
 
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "nexus-mc-edition",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "cap:build": "vite build && cap sync android",
+    "cap:sync": "cap sync android"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.7.2",
